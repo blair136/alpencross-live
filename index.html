@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Alpencross – Live-Standort</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+  html, body { margin: 0; height: 100%; font-family: -apple-system, system-ui, sans-serif; }
+  #map { height: 100%; }
+  .kopf {
+    position: fixed; top: 12px; left: 50%; transform: translateX(-50%);
+    z-index: 1000; background: rgba(255,255,255,0.96); border-radius: 14px;
+    padding: 10px 18px; box-shadow: 0 4px 18px rgba(0,0,0,0.18); text-align: center;
+    max-width: 92vw;
+  }
+  .kopf b { color: #0E5E66; }
+  .stand { font-size: 13px; color: #445; margin-top: 3px; }
+  .warnung { color: #B03A2E; font-weight: 700; }
+  .alarm {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 1001;
+    background: #B03A2E; color: #fff; padding: 14px 18px;
+    box-shadow: 0 -4px 18px rgba(0,0,0,0.25);
+  }
+  .alarm h2 { margin: 0 0 4px; font-size: 17px; }
+  .alarm p { margin: 2px 0; font-size: 14px; line-height: 1.35; }
+  .alarm a { color: #fff; font-weight: 700; }
+  .versteckt { display: none; }
+</style>
+</head>
+<body>
+<div class="kopf">
+  <b>Alpencross · Live-Standort</b>
+  <div class="stand" id="stand">Verbinde …</div>
+</div>
+<div id="map"></div>
+<div class="alarm versteckt" id="alarm">
+  <h2>⚠️ Überfällig</h2>
+  <p id="alarmText"></p>
+  <p id="alarmOrt"></p>
+  <p>Notruf: <a href="tel:112">112</a> (EU) · <a href="tel:140">140</a> (Bergrettung Österreich) ·
+     <a href="tel:118">118</a> (Italien/Südtirol)</p>
+</div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+  var URL_BASIS = 'https://srwkwxmmhefivmvxfnos.supabase.co';
+  var KEY = 'sb_publishable_8U2BtQi77k6PCifEmXFYDg_VxSpwhoL';
+  var token = new URLSearchParams(location.search).get('t') || '';
+
+  var map = L.map('map').setView([46.5, 11.5], 6);
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 17,
+    attribution: '&copy; OpenStreetMap'
+  }).addTo(map);
+  var marker = null, spur = L.polyline([], { color: '#0E9AA5', weight: 4 }).addTo(map);
+  var ersterFix = true;
+
+  function zeit(iso) {
+    var s = Math.round((Date.now() - new Date(iso).getTime()) / 1000);
+    if (s < 90) return 'gerade eben';
+    if (s < 3600) return 'vor ' + Math.round(s / 60) + ' min';
+    return 'vor ' + (s / 3600).toFixed(1) + ' h';
+  }
+  function uhr(iso) {
+    return new Date(iso).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+  }
+
+  function laden() {
+    fetch(URL_BASIS + '/rest/v1/rpc/live_lesen', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', apikey: KEY, authorization: 'Bearer ' + KEY },
+      body: JSON.stringify({ rt: token })
+    }).then(function (r) { return r.json(); }).then(function (rows) {
+      var stand = document.getElementById('stand');
+      var alarm = document.getElementById('alarm');
+      var p = rows && rows[0];
+      if (!p) {
+        stand.innerHTML = '<span class="warnung">Kein aktives Teilen — die Wanderung ist beendet oder der Link abgelaufen.</span>';
+        alarm.classList.add('versteckt');
+        return;
+      }
+      var pos = [p.lat, p.lng];
+      if (!marker) marker = L.marker(pos).addTo(map);
+      marker.setLatLng(pos);
+      spur.addLatLng(pos);
+      if (ersterFix) { map.setView(pos, 14); ersterFix = false; }
+
+      var text = 'Aktualisiert ' + zeit(p.aktualisiert) +
+        (p.ele != null ? ' · ' + p.ele + ' m' : '') +
+        ' · unterwegs seit ' + uhr(p.gestartet) + ' Uhr';
+
+      // Rückmeldezeit: Ohne sie bleibt die Seite eine reine Anzeige. Mit ihr
+      // meldet sie sich selbst, wenn jemand nicht zurück ist — genau dann
+      // braucht es eine Entscheidung, und niemand starrt auf den Bildschirm.
+      if (p.zurueck_um) {
+        var restMin = Math.round((new Date(p.zurueck_um).getTime() - Date.now()) / 60000);
+        if (restMin >= 0) {
+          text += ' · zurück gegen ' + uhr(p.zurueck_um) + ' Uhr';
+          alarm.classList.add('versteckt');
+        } else {
+          var ueber = Math.abs(restMin);
+          text += ' · <span class="warnung">überfällig seit ' +
+            (ueber < 60 ? ueber + ' min' : (ueber / 60).toFixed(1) + ' h') + '</span>';
+          document.getElementById('alarmText').textContent =
+            'Rückmeldung war für ' + uhr(p.zurueck_um) + ' Uhr angekündigt — seither ' +
+            (ueber < 60 ? ueber + ' Minuten' : (ueber / 60).toFixed(1) + ' Stunden') +
+            ' vergangen. Letztes Signal ' + zeit(p.aktualisiert) + '.';
+          document.getElementById('alarmOrt').textContent =
+            'Letzte Position: ' + p.lat.toFixed(5) + ', ' + p.lng.toFixed(5) +
+            (p.ele != null ? ' · ' + p.ele + ' m' : '');
+          alarm.classList.remove('versteckt');
+        }
+      }
+      stand.innerHTML = text;
+    }).catch(function () {
+      document.getElementById('stand').textContent = 'Keine Verbindung — versuche es weiter …';
+    });
+  }
+  if (!token) {
+    document.getElementById('stand').innerHTML = '<span class="warnung">Ungültiger Link.</span>';
+  } else {
+    laden();
+    setInterval(laden, 20000);
+  }
+</script>
+</body>
+</html>
