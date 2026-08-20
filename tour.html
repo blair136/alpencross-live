@@ -78,10 +78,41 @@ function baueGpx(tour, etappen) {
   return `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="Alpencross" xmlns="http://www.topografix.com/GPX/1/1">\n  <metadata><name>${tour.n}</name>\n    <copyright author="OpenStreetMap-Mitwirkende"><license>https://opendatacommons.org/licenses/odbl/</license></copyright>\n  </metadata>\n${tracks}\n</gpx>\n`;
 }
 
-try {
-  const roh = new URLSearchParams(location.hash.slice(1)).get('d');
-  if (!roh) throw new Error('Kein Tourdatensatz im Link.');
-  const tour = JSON.parse(ausBase64Url(roh));
+const SUPABASE = 'https://srwkwxmmhefivmvxfnos.supabase.co';
+const SCHLUESSEL = 'sb_publishable_8U2BtQi77k6PCifEmXFYDg_VxSpwhoL';
+
+/*
+ * Zwei Wege zur Tour.
+ *
+ * Der kurze Link (?t=…) ist der Normalfall: Die Planung liegt unter einem
+ * Zufalls-Token in der Datenbank, und der Link bleibt so kurz, dass man ihn
+ * ohne schlechtes Gewissen verschickt. Der erste Entwurf steckte alles ins
+ * Fragment (#d=…) — technisch schöner, weil nichts auf einem Server lag,
+ * aber ein Vier-Tage-Trek ergab mehrere tausend Zeichen, und im Messenger
+ * sah das aus wie ein Datenunfall. Solche Links funktionieren weiterhin.
+ */
+function holeTour() {
+  const hash = new URLSearchParams(location.hash.slice(1)).get('d');
+  if (hash) return Promise.resolve(JSON.parse(ausBase64Url(hash)));
+  const token = new URLSearchParams(location.search).get('t');
+  if (!token) return Promise.reject(new Error('Kein Tourdatensatz im Link.'));
+  return fetch(SUPABASE + '/rest/v1/rpc/tour_lesen', {
+    method: 'POST',
+    headers: {
+      apikey: SCHLUESSEL,
+      Authorization: 'Bearer ' + SCHLUESSEL,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ t: token }),
+  })
+    .then((r) => r.json())
+    .then((d) => {
+      if (!d) throw new Error('Diese Tour gibt es nicht mehr.');
+      return d;
+    });
+}
+
+holeTour().then((tour) => {
   const etappen = (tour.s || []).map((e) => ({ ...e, punkte: entpackeLinie(e.p || '') }));
 
   const km = etappen.reduce((a, e) => a + (e.k || 0), 0);
@@ -148,12 +179,11 @@ try {
   const name = (tour.n || 'tour').replace(/[^\w-]+/g, '-');
   liste.insertAdjacentHTML('beforeend',
     `<a class="laden" href="${url}" download="${name}.gpx">↓ Als GPX herunterladen</a>
-     <div class="fuss">Geplant mit Alpencross. Die Tour steckt vollständig in diesem Link —
-     sie liegt auf keinem Server. Kartendaten © OpenStreetMap-Mitwirkende.</div>`);
-} catch (e) {
+     <div class="fuss">Geplant mit Alpencross. Kartendaten © OpenStreetMap-Mitwirkende.</div>`);
+}).catch((e) => {
   document.getElementById('app').innerHTML =
     `<div class="fehler">Dieser Link enthält keine lesbare Tour.<br><br>${e.message}</div>`;
-}
+});
 </script>
 </body>
 </html>
