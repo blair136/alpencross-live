@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Alpencross – Geplante Tour</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+  :root { --ink:#12333D; --weich:#5A7682; --linie:#D9327A; --gruen:#0E5E66; }
+  html, body { margin:0; font-family:-apple-system, system-ui, sans-serif; color:var(--ink); background:#F3F8F9; }
+  header { padding:18px 18px 10px; }
+  h1 { margin:0; font-size:22px; }
+  .meta { color:var(--weich); font-size:14px; margin-top:4px; }
+  #map { height:44vh; min-height:260px; }
+  .inhalt { padding:14px 18px 40px; max-width:720px; margin:0 auto; }
+  .etappe { background:#fff; border-radius:14px; padding:14px 16px; margin-bottom:10px;
+            box-shadow:0 2px 10px rgba(14,42,51,0.08); }
+  .nr { font-size:12px; font-weight:700; letter-spacing:.6px; text-transform:uppercase; color:var(--gruen); }
+  .weg { font-size:17px; font-weight:700; margin:2px 0 6px; }
+  .zahlen { display:flex; flex-wrap:wrap; gap:8px; }
+  .chip { background:#EDF4F5; border-radius:8px; padding:4px 9px; font-size:13px; font-weight:600; }
+  .chip.auf { background:#FBEDE7; color:#C24E24; }
+  .chip.ab  { background:#E9F1F8; color:#2F72A8; }
+  .huetten { font-size:13px; color:var(--weich); margin-top:8px; line-height:1.45; }
+  .laden { display:block; text-align:center; text-decoration:none; background:var(--gruen); color:#fff;
+           font-weight:700; padding:14px; border-radius:12px; margin-top:16px; }
+  .fuss { font-size:12px; color:var(--weich); margin-top:18px; line-height:1.5; text-align:center; }
+  .fehler { padding:40px 18px; text-align:center; color:var(--weich); }
+</style>
+</head>
+<body>
+<div id="app"><div class="fehler">Tour wird geladen …</div></div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+/*
+ * Geplante Tour aus dem Link.
+ *
+ * Die Daten stecken im Fragment (#d=…) und werden deshalb NIE an einen
+ * Server geschickt — Browser senden alles hinter der Raute nicht mit. Die
+ * Planung liegt also nirgends gespeichert, der Link ist die Tour. Wer ihn
+ * nicht hat, sieht nichts; wer ihn löscht, hat sie weg. Kein Konto, keine
+ * Datenbank, keine Frage nach Aufbewahrungsfristen.
+ */
+
+function ausBase64Url(s) {
+  const roh = atob(s.replace(/-/g, '+').replace(/_/g, '/'));
+  const bytes = Uint8Array.from(roh, (c) => c.charCodeAt(0));
+  return new TextDecoder().decode(bytes);
+}
+
+/* Polylinien-Kodierung wie bei Kartendiensten üblich: Deltas in 1e-5 Grad,
+   je fünf Bit mit Fortsetzungsflag. Rund vier Zeichen je Punkt statt
+   zwanzig — dadurch passt eine Sechs-Tage-Tour überhaupt in einen Link. */
+function entpackeLinie(str) {
+  const punkte = [];
+  let i = 0, lat = 0, lng = 0;
+  while (i < str.length) {
+    let ergebnis = 0, schritt = 0, b;
+    do { b = str.charCodeAt(i++) - 63; ergebnis |= (b & 0x1f) << schritt; schritt += 5; } while (b >= 0x20);
+    lat += (ergebnis & 1) ? ~(ergebnis >> 1) : (ergebnis >> 1);
+    ergebnis = 0; schritt = 0;
+    do { b = str.charCodeAt(i++) - 63; ergebnis |= (b & 0x1f) << schritt; schritt += 5; } while (b >= 0x20);
+    lng += (ergebnis & 1) ? ~(ergebnis >> 1) : (ergebnis >> 1);
+    punkte.push([lat / 1e5, lng / 1e5]);
+  }
+  return punkte;
+}
+
+function zahl(n) { return n.toLocaleString('de-DE'); }
+
+function baueGpx(tour, etappen) {
+  const tracks = etappen.map((e, i) => {
+    const pts = e.punkte
+      .map(([la, ln]) => `      <trkpt lat="${la.toFixed(6)}" lon="${ln.toFixed(6)}"/>`)
+      .join('\n');
+    return `  <trk>\n    <name>${(i + 1)}. ${e.a} → ${e.b}</name>\n    <trkseg>\n${pts}\n    </trkseg>\n  </trk>`;
+  }).join('\n');
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="Alpencross" xmlns="http://www.topografix.com/GPX/1/1">\n  <metadata><name>${tour.n}</name>\n    <copyright author="OpenStreetMap-Mitwirkende"><license>https://opendatacommons.org/licenses/odbl/</license></copyright>\n  </metadata>\n${tracks}\n</gpx>\n`;
+}
+
+try {
+  const roh = new URLSearchParams(location.hash.slice(1)).get('d');
+  if (!roh) throw new Error('Kein Tourdatensatz im Link.');
+  const tour = JSON.parse(ausBase64Url(roh));
+  const etappen = (tour.s || []).map((e) => ({ ...e, punkte: entpackeLinie(e.p || '') }));
+
+  const km = etappen.reduce((a, e) => a + (e.k || 0), 0);
+  const hm = etappen.reduce((a, e) => a + (e.u || 0), 0);
+
+  document.getElementById('app').innerHTML =
+    `<header><h1>${tour.n || 'Geplante Tour'}</h1>
+      <div class="meta">${etappen.length} Etappe${etappen.length === 1 ? '' : 'n'} ·
+      ${km.toFixed(1).replace('.', ',')} km · ↑ ${zahl(hm)} m</div></header>
+     <div id="map"></div>
+     <div class="inhalt" id="liste"></div>`;
+
+  const karte = L.map('map', { scrollWheelZoom: false });
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 17, attribution: '© OpenStreetMap-Mitwirkende',
+  }).addTo(karte);
+
+  const alle = [];
+  etappen.forEach((e, i) => {
+    if (!e.punkte.length) return;
+    L.polyline(e.punkte, { color: '#ffffff', weight: 7, opacity: 0.9 }).addTo(karte);
+    L.polyline(e.punkte, { color: '#D9327A', weight: 4 }).addTo(karte);
+    alle.push(...e.punkte);
+    const ziel = e.punkte[e.punkte.length - 1];
+    L.marker(ziel).addTo(karte).bindPopup(`<b>${i + 1}. Etappe</b><br>${e.b}`);
+  });
+  if (alle.length) karte.fitBounds(L.latLngBounds(alle).pad(0.12));
+
+  const liste = document.getElementById('liste');
+  liste.innerHTML = etappen.map((e, i) => `
+    <div class="etappe">
+      <div class="nr">Etappe ${i + 1}</div>
+      <div class="weg">${e.a} → ${e.b}</div>
+      <div class="zahlen">
+        <span class="chip">${(e.k || 0).toFixed(1).replace('.', ',')} km</span>
+        <span class="chip auf">↑ ${zahl(e.u || 0)} m</span>
+        <span class="chip ab">↓ ${zahl(e.d || 0)} m</span>
+      </div>
+      ${e.h && e.h.length ? `<div class="huetten">Unterwegs: ${e.h.join(' · ')}</div>` : ''}
+    </div>`).join('');
+
+  const gpx = baueGpx(tour, etappen);
+  const url = URL.createObjectURL(new Blob([gpx], { type: 'application/gpx+xml' }));
+  const name = (tour.n || 'tour').replace(/[^\w-]+/g, '-');
+  liste.insertAdjacentHTML('beforeend',
+    `<a class="laden" href="${url}" download="${name}.gpx">↓ Als GPX herunterladen</a>
+     <div class="fuss">Geplant mit Alpencross. Die Tour steckt vollständig in diesem Link —
+     sie liegt auf keinem Server. Kartendaten © OpenStreetMap-Mitwirkende.</div>`);
+} catch (e) {
+  document.getElementById('app').innerHTML =
+    `<div class="fehler">Dieser Link enthält keine lesbare Tour.<br><br>${e.message}</div>`;
+}
+</script>
+</body>
+</html>
