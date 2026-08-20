@@ -108,7 +108,27 @@ try {
     const ziel = e.punkte[e.punkte.length - 1];
     L.marker(ziel).addTo(karte).bindPopup(`<b>${i + 1}. Etappe</b><br>${e.b}`);
   });
-  if (alle.length) karte.fitBounds(L.latLngBounds(alle).pad(0.12));
+  /*
+   * Erst messen, dann einpassen.
+   *
+   * Die Karte entsteht in einem Element, das der Browser gerade erst
+   * eingehängt hat — Leaflet misst dann null Höhe und rechnet die
+   * Zoomstufe für eine Fläche von 0×0 aus. Ergebnis war die Weltkarte mit
+   * einem Stecknadelkopf irgendwo in Europa. `invalidateSize` misst neu,
+   * und das Einpassen wartet einen Bildaufbau lang.
+   */
+  if (alle.length) {
+    const grenzen = L.latLngBounds(alle).pad(0.12);
+    karte.fitBounds(grenzen);
+    requestAnimationFrame(() => {
+      karte.invalidateSize();
+      karte.fitBounds(grenzen);
+    });
+    window.addEventListener('load', () => {
+      karte.invalidateSize();
+      karte.fitBounds(grenzen);
+    });
+  }
 
   const liste = document.getElementById('liste');
   liste.innerHTML = etappen.map((e, i) => `
