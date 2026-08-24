@@ -4,42 +4,193 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Alpencross – Geplante Tour</title>
+<meta name="theme-color" content="#0A2028">
+<link rel="icon" href="icons/berge.png">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <style>
-  :root { --ink:#12333D; --weich:#5A7682; --linie:#D9327A; --gruen:#0E5E66; }
-  html, body { margin:0; font-family:-apple-system, system-ui, sans-serif; color:var(--ink); background:#F3F8F9; }
-  header { padding:18px 18px 10px; }
-  h1 { margin:0; font-size:22px; }
-  .meta { color:var(--weich); font-size:14px; margin-top:4px; }
-  #map { height:44vh; min-height:260px; }
-  .inhalt { padding:14px 18px 40px; max-width:720px; margin:0 auto; }
-  .etappe { background:#fff; border-radius:14px; padding:14px 16px; margin-bottom:10px;
-            box-shadow:0 2px 10px rgba(14,42,51,0.08); }
-  .nr { font-size:12px; font-weight:700; letter-spacing:.6px; text-transform:uppercase; color:var(--gruen); }
-  .weg { font-size:17px; font-weight:700; margin:2px 0 6px; }
-  .zahlen { display:flex; flex-wrap:wrap; gap:8px; }
-  .chip { background:#EDF4F5; border-radius:8px; padding:4px 9px; font-size:13px; font-weight:600; }
-  .chip.auf { background:#FBEDE7; color:#C24E24; }
-  .chip.ab  { background:#E9F1F8; color:#2F72A8; }
-  .huetten { font-size:13px; color:var(--weich); margin-top:8px; line-height:1.45; }
-  .laden { display:block; text-align:center; text-decoration:none; background:var(--gruen); color:#fff;
-           font-weight:700; padding:14px; border-radius:12px; margin-top:16px; }
-  .fuss { font-size:12px; color:var(--weich); margin-top:18px; line-height:1.5; text-align:center; }
-  .fehler { padding:40px 18px; text-align:center; color:var(--weich); }
+  /*
+   * Die Farben kommen aus dem App-Icon: tiefes Petrol, geschichtete
+   * Bergsilhouetten, die magentafarbene Route mit weißen Punkten. Wer die
+   * App kennt, erkennt die Seite wieder; wer sie nicht kennt, bekommt einen
+   * Eindruck davon, worauf er sich einlässt.
+   */
+  :root {
+    --tinte:#10333D; --weich:#5C7079; --leise:#7A8A93;
+    --route:#D9327A; --petrol:#0E9AA5; --petrol-tief:#0E5E66;
+    --auf:#C24E24; --ab:#2F72A8;
+    --papier:#F2F7F8; --karte:#FFFFFF; --rand:#E1EBED;
+    --schatten:0 2px 14px rgba(14,42,51,.09);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --tinte:#E8F1F3; --weich:#9DAEB5; --leise:#7E9099;
+      --papier:#0B1B21; --karte:#122831; --rand:#1E3944;
+      --schatten:0 2px 14px rgba(0,0,0,.4);
+    }
+  }
+
+  * { box-sizing:border-box; }
+  html,body { margin:0; }
+  body {
+    font-family:ui-rounded, -apple-system, system-ui, "Segoe UI", sans-serif;
+    color:var(--tinte); background:var(--papier);
+    -webkit-font-smoothing:antialiased;
+  }
+
+  /* ----------------------------------------------------- Kopfbereich */
+
+  .held { position:relative; overflow:hidden; background:#0A2028; }
+  /*
+   * Zwei Ebenen, mit Absicht. Der Hintergrund darf beschnitten werden — bei
+   * Bergen fällt das niemandem auf. Die Route darf es nicht: Sie ist die
+   * Aussage dieses Bildes, und eine Linie, deren erster und letzter Punkt
+   * außerhalb liegen, erzählt die Tour nur halb. Deshalb „slice" für das
+   * eine und „meet" für das andere.
+   */
+  .held-bild, .held-route {
+    position:absolute; inset:0; width:100%; height:100%; display:block;
+  }
+  .held-inhalt {
+    position:relative; z-index:1;
+    max-width:720px; margin:0 auto;
+    padding:22px 20px 26px;
+    min-height:clamp(340px, 60vh, 470px);
+    display:flex; flex-direction:column; justify-content:space-between;
+    color:#fff;
+  }
+  .marke {
+    display:inline-flex; align-items:center; gap:8px;
+    font-size:12px; font-weight:700; letter-spacing:1.4px; text-transform:uppercase;
+    color:#9FD9DE;
+  }
+  /* Die Icons der App sind schwarze Strichzeichnungen — auf dunklem Grund
+     werden sie invertiert, sonst wären sie ein schwarzer Fleck. */
+  .marke img { width:22px; height:22px; filter:invert(1) opacity(.85); }
+
+  .von-nach {
+    font-size:14px; font-weight:600; color:#9FD9DE; margin-bottom:6px;
+    text-shadow:0 1px 12px rgba(0,0,0,.6);
+  }
+  .held h1 {
+    margin:0 0 12px; font-size:clamp(28px, 7vw, 40px); line-height:1.1;
+    font-weight:800; letter-spacing:-.5px;
+    text-shadow:0 2px 20px rgba(0,0,0,.5);
+  }
+  .kennzahlen { display:flex; flex-wrap:wrap; gap:8px; }
+  .kennzahl {
+    display:inline-flex; align-items:center; gap:6px;
+    background:rgba(255,255,255,.13); border:1px solid rgba(255,255,255,.18);
+    -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px);
+    border-radius:999px; padding:7px 13px;
+    font-size:14px; font-weight:700; color:#fff;
+  }
+  .kennzahl svg { width:15px; height:15px; }
+
+  /* --------------------------------------------------------- Inhalt */
+
+  .inhalt { max-width:720px; margin:0 auto; padding:0 18px 44px; }
+  .abschnitt {
+    display:flex; align-items:center; gap:9px;
+    margin:26px 2px 12px; font-size:13px; font-weight:800;
+    letter-spacing:1.1px; text-transform:uppercase; color:var(--petrol-tief);
+  }
+  @media (prefers-color-scheme: dark) { .abschnitt { color:var(--petrol); } }
+  .abschnitt img { width:24px; height:24px; opacity:.8; }
+  @media (prefers-color-scheme: dark) { .abschnitt img { filter:invert(1); opacity:.75; } }
+
+  #karte {
+    height:46vh; min-height:280px; border-radius:16px; overflow:hidden;
+    box-shadow:var(--schatten); border:1px solid var(--rand);
+  }
+  .leaflet-container { background:var(--karte); }
+
+  /* Nummerierte Etappenziele statt der voreingestellten Stecknadel. */
+  .ziel-nr {
+    width:26px; height:26px; border-radius:50%;
+    background:var(--route); color:#fff; border:2.5px solid #fff;
+    font:700 13px/21px ui-rounded, system-ui, sans-serif; text-align:center;
+    box-shadow:0 2px 6px rgba(0,0,0,.35);
+  }
+
+  .etappe {
+    background:var(--karte); border:1px solid var(--rand); border-radius:16px;
+    padding:15px 17px; margin-bottom:11px; box-shadow:var(--schatten);
+  }
+  .nr {
+    font-size:11px; font-weight:800; letter-spacing:1.2px;
+    text-transform:uppercase; color:var(--petrol-tief);
+  }
+  @media (prefers-color-scheme: dark) { .nr { color:var(--petrol); } }
+  .weg { font-size:18px; font-weight:800; margin:3px 0 10px; letter-spacing:-.2px; }
+  .zahlen { display:flex; flex-wrap:wrap; gap:7px; }
+  .chip {
+    display:inline-flex; align-items:center; gap:5px;
+    background:#EDF4F5; color:var(--tinte);
+    border-radius:9px; padding:5px 10px; font-size:13px; font-weight:700;
+  }
+  @media (prefers-color-scheme: dark) { .chip { background:#193742; } }
+  .chip svg { width:13px; height:13px; }
+  .chip.auf { background:#FBEDE7; color:#A8431F; }
+  .chip.ab  { background:#E9F1F8; color:#28618F; }
+  @media (prefers-color-scheme: dark) {
+    .chip.auf { background:#3A231A; color:#E8916A; }
+    .chip.ab  { background:#16303F; color:#8FBEE4; }
+  }
+  .huetten {
+    display:flex; align-items:flex-start; gap:8px;
+    font-size:13.5px; color:var(--weich); margin-top:11px; line-height:1.5;
+  }
+  .huetten img { width:19px; height:19px; opacity:.65; flex-shrink:0; margin-top:1px; }
+  @media (prefers-color-scheme: dark) { .huetten img { filter:invert(1); opacity:.6; } }
+
+  .laden {
+    display:flex; align-items:center; justify-content:center; gap:10px;
+    text-decoration:none; color:#fff; font-weight:800; font-size:16px;
+    background:linear-gradient(135deg, var(--petrol) 0%, var(--petrol-tief) 100%);
+    padding:16px; border-radius:14px; margin-top:20px;
+    box-shadow:0 4px 16px rgba(14,94,102,.32);
+  }
+  .laden img { width:24px; height:24px; filter:invert(1); }
+
+  .fuss {
+    font-size:12px; color:var(--leise); margin-top:22px;
+    line-height:1.6; text-align:center;
+  }
+
+  /* ------------------------------------------------- Laden / Fehler */
+
+  .zustand {
+    min-height:100vh; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; gap:14px;
+    padding:40px 24px; text-align:center; background:#0A2028; color:#fff;
+  }
+  .zustand img { width:64px; height:64px; filter:invert(1) opacity(.7); }
+  .zustand h2 { margin:0; font-size:21px; font-weight:800; }
+  .zustand p { margin:0; color:#9DAEB5; font-size:15px; line-height:1.55; max-width:34ch; }
+  .puls { animation:puls 1.6s ease-in-out infinite; }
+  @keyframes puls { 0%,100% { opacity:.45; } 50% { opacity:.95; } }
+  @media (prefers-reduced-motion:reduce) { .puls { animation:none; } }
 </style>
 </head>
 <body>
-<div id="app"><div class="fehler">Tour wird geladen …</div></div>
+<div id="app">
+  <div class="zustand">
+    <img class="puls" src="icons/berge.png" alt="">
+    <h2>Tour wird geladen …</h2>
+  </div>
+</div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 /*
  * Geplante Tour aus dem Link.
  *
- * Die Daten stecken im Fragment (#d=…) und werden deshalb NIE an einen
- * Server geschickt — Browser senden alles hinter der Raute nicht mit. Die
- * Planung liegt also nirgends gespeichert, der Link ist die Tour. Wer ihn
- * nicht hat, sieht nichts; wer ihn löscht, hat sie weg. Kein Konto, keine
- * Datenbank, keine Frage nach Aufbewahrungsfristen.
+ * Zwei Wege. Der kurze Link (?t=…) ist der Normalfall: Die Planung liegt
+ * unter einem Zufalls-Token in der Datenbank, und der Link bleibt so kurz,
+ * dass man ihn ohne schlechtes Gewissen verschickt. Der erste Entwurf
+ * steckte alles ins Fragment (#d=…) — technisch schöner, weil nichts auf
+ * einem Server lag, aber ein Vier-Tage-Trek ergab mehrere tausend Zeichen,
+ * und im Messenger sah das aus wie ein Datenunfall. Solche Links
+ * funktionieren weiterhin.
  */
 
 function ausBase64Url(s) {
@@ -50,7 +201,7 @@ function ausBase64Url(s) {
 
 /* Polylinien-Kodierung wie bei Kartendiensten üblich: Deltas in 1e-5 Grad,
    je fünf Bit mit Fortsetzungsflag. Rund vier Zeichen je Punkt statt
-   zwanzig — dadurch passt eine Sechs-Tage-Tour überhaupt in einen Link. */
+   zwanzig — dadurch bleibt der Datensatz klein und die Seite schnell. */
 function entpackeLinie(str) {
   const punkte = [];
   let i = 0, lat = 0, lng = 0;
@@ -67,30 +218,183 @@ function entpackeLinie(str) {
 }
 
 function zahl(n) { return n.toLocaleString('de-DE'); }
+function km(n) { return (n || 0).toFixed(1).replace('.', ','); }
+/* Aus fremdem Text wird hier Auszeichnung gebaut — Tourennamen und
+   Hüttennamen kommen aus einem geteilten Datensatz und dürfen kein Markup
+   einschleusen. */
+function sicher(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, (c) =>
+    ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+}
 
-function baueGpx(tour, etappen) {
-  const tracks = etappen.map((e, i) => {
-    const pts = e.punkte
-      .map(([la, ln]) => `      <trkpt lat="${la.toFixed(6)}" lon="${ln.toFixed(6)}"/>`)
-      .join('\n');
-    return `  <trk>\n    <name>${(i + 1)}. ${e.a} → ${e.b}</name>\n    <trkseg>\n${pts}\n    </trkseg>\n  </trk>`;
-  }).join('\n');
-  return `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="Alpencross" xmlns="http://www.topografix.com/GPX/1/1">\n  <metadata><name>${tour.n}</name>\n    <copyright author="OpenStreetMap-Mitwirkende"><license>https://opendatacommons.org/licenses/odbl/</license></copyright>\n  </metadata>\n${tracks}\n</gpx>\n`;
+/* Kleine Zeichen, inline statt als Datei: Sie erben die Textfarbe und
+   bleiben auf jedem Bildschirm scharf. */
+const PFEIL_AUF = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 13V3M8 3 3.5 7.5M8 3l4.5 4.5" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const PFEIL_AB  = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 3v10M8 13l-4.5-4.5M8 13l4.5-4.5" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const WEGZEICHEN = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M1.5 11c2-3.5 3.2 2 5-1.5S10.5 3 14.5 5.5" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const ETAPPEN_ZEICHEN = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="3" cy="12.5" r="2.2" fill="currentColor"/><circle cx="13" cy="3.5" r="2.2" fill="currentColor"/><path d="M4.6 11 11.4 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-dasharray="0.1 3.2"/></svg>';
+
+/**
+ * Der Kopfbereich — nachempfunden dem App-Icon.
+ *
+ * Geschichtete Bergsilhouetten vor einem Petrol-Verlauf, darüber die Route
+ * als magentafarbene Linie mit weißen Punkten. Die Berge sind Zierde; die
+ * **Linie ist es nicht**. Sie zeigt den tatsächlichen Verlauf der Planung:
+ * X nach zurückgelegter Strecke, Y nach aufsummierten Höhenmetern. Wer den
+ * Link öffnet, sieht auf einen Blick, ob es ein stetiger Anstieg wird oder
+ * ein Auf und Ab — genau der Vorgeschmack, um den es hier geht.
+ *
+ * Kein echtes Höhenprofil: Der geteilte Datensatz kennt je Etappe nur
+ * Auf- und Abstieg in Summe, nicht die Höhe jedes einzelnen Punktes.
+ * Deshalb sitzt je Etappe ein Punkt, nicht je Meter.
+ */
+/**
+ * Der Kopfbereich — nachempfunden dem App-Icon.
+ *
+ * Geschichtete Bergsilhouetten vor einem Petrol-Verlauf, darüber die Route
+ * als magentafarbene Linie mit weißen Punkten. Die Berge sind Zierde; die
+ * **Linie ist es nicht**. Sie zeigt den tatsächlichen Verlauf der Planung:
+ * X nach zurückgelegter Strecke, Y nach aufsummierten Höhenmetern. Wer den
+ * Link öffnet, sieht auf einen Blick, ob es ein stetiger Anstieg wird oder
+ * ein Auf und Ab — genau der Vorgeschmack, um den es hier geht.
+ *
+ * Kein echtes Höhenprofil: Der geteilte Datensatz kennt je Etappe nur Auf-
+ * und Abstieg in Summe, nicht die Höhe jedes einzelnen Punktes. Deshalb
+ * sitzt je Etappe ein Punkt, nicht je Meter.
+ */
+function heldBild() {
+  const B = 1200, H = 560;
+
+  // Sterne fest gesetzt statt zufällig: Bei jedem Aufruf dieselbe Seite.
+  const sterne = [[130,64,1.6],[280,38,1.1],[420,88,1.4],[610,46,1.8],[760,96,1.2],
+                  [900,58,1.5],[1060,86,1.2],[1150,40,1.6],[520,120,1],[340,140,1.1]]
+    .map(([x, y, r]) => `<circle cx="${x}" cy="${y}" r="${r}" fill="#fff" opacity=".5"/>`)
+    .join('');
+
+  return `
+<svg class="held-bild" viewBox="0 0 ${B} ${H}" preserveAspectRatio="xMidYMid slice"
+     xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
+  <defs>
+    <linearGradient id="himmel" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#071A21"/>
+      <stop offset="42%"  stop-color="#0C3B44"/>
+      <stop offset="72%"  stop-color="#116B75"/>
+      <stop offset="100%" stop-color="#0A2028"/>
+    </linearGradient>
+    <radialGradient id="schein" cx="30%" cy="62%" r="52%">
+      <stop offset="0%"   stop-color="#18A9B4" stop-opacity=".55"/>
+      <stop offset="100%" stop-color="#18A9B4" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="scrim" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#061319" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#061319" stop-opacity=".82"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="${B}" height="${H}" fill="url(#himmel)"/>
+  <rect width="${B}" height="${H}" fill="url(#schein)"/>
+  ${sterne}
+
+  <!-- Drei Kämme, von hinten nach vorn dunkler: erzeugt Tiefe, ohne dass
+       ein Foto geladen werden müsste. -->
+  <path d="M0 330 L165 205 L255 268 L400 150 L545 272 L660 214 L810 118 L960 250 L1080 190 L1200 288 L1200 560 L0 560Z"
+        fill="#12454F" opacity=".72"/>
+  <path d="M0 400 L145 300 L300 372 L455 250 L600 356 L760 262 L905 350 L1060 288 L1200 372 L1200 560 L0 560Z"
+        fill="#0C2F38"/>
+  <path d="M0 470 L190 392 L360 452 L520 366 L690 448 L860 380 L1030 452 L1200 400 L1200 560 L0 560Z"
+        fill="#071F26"/>
+
+  <rect y="${H - 300}" width="${B}" height="300" fill="url(#scrim)"/>
+</svg>
+<svg class="held-route" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
+  <defs>
+    <filter id="glut" x="-25%" y="-25%" width="150%" height="150%">
+      <feGaussianBlur stdDeviation="7" result="weich"/>
+      <feMerge><feMergeNode in="weich"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <g id="routen-linie"></g>
+</svg>`;
+}
+
+/**
+ * Die Routenlinie in der tatsächlichen Größe des Kopfbereichs zeichnen.
+ *
+ * Zuerst steckte sie im selben SVG wie die Berge. Das ging schief, sobald
+ * das Seitenverhältnis nicht passte: Auf dem Telefon wurde sie zu einem
+ * gestauchten Strich in der Mitte, im breiten Fenster liefen ihr erster und
+ * letzter Punkt aus dem Bild. Beides ließ sich mit `preserveAspectRatio`
+ * nicht gleichzeitig lösen — das eine Bild soll beschnitten werden, das
+ * andere vollständig bleiben. Also wird hier gemessen und in Bildpunkten
+ * gerechnet; bei jeder Größenänderung neu.
+ */
+function zeichneRoute(etappen) {
+  const svg = document.querySelector('.held-route');
+  const gruppe = document.getElementById('routen-linie');
+  if (!svg || !gruppe) return;
+
+  const held = svg.parentElement;
+  const B = held.clientWidth, H = held.clientHeight;
+  if (!B || !H) return;
+  svg.setAttribute('viewBox', `0 0 ${B} ${H}`);
+
+  /*
+   * Stützpunkte: Start bei null, danach je Etappe die Summe.
+   *
+   * Bei einer einzelnen Tagestour geht das nicht auf: 840 Meter hinauf und
+   * 840 wieder hinunter heben sich zu null auf, und übrig bliebe ein
+   * flacher Strich für einen Tag am Berg. Deshalb bekommt die eine Etappe
+   * drei Punkte — hinauf und wieder hinunter. Genauer wäre nur ein echtes
+   * Höhenprofil, und dessen Daten stehen im geteilten Datensatz nicht.
+   */
+  const stuetzen = [{ x: 0, h: 0 }];
+  if (etappen.length === 1) {
+    const e = etappen[0];
+    stuetzen.push({ x: (e.k || 1) * 0.55, h: e.u || 0 });
+    stuetzen.push({ x: e.k || 1, h: (e.u || 0) - (e.d || 0) });
+  } else {
+    let gelaufen = 0, hoehe = 0;
+    for (const e of etappen) {
+      gelaufen += e.k || 0;
+      hoehe += (e.u || 0) - (e.d || 0);
+      stuetzen.push({ x: gelaufen, h: hoehe });
+    }
+  }
+
+  const maxX = stuetzen[stuetzen.length - 1].x || 1;
+  const hoehen = stuetzen.map((s) => s.h);
+  const hMin = Math.min(...hoehen), hMax = Math.max(...hoehen);
+  // Eine flache Tour hätte sonst eine Division durch null — und eine Linie,
+  // die im Nichts verschwindet.
+  const spanne = hMax - hMin || 1;
+
+  // Ränder in Anteilen, damit die Linie auf jedem Gerät gleich atmet. Unten
+  // bleibt Platz für Titel und Kennzahlen.
+  const links = B * 0.09, rechts = B * 0.91;
+  const oben = H * 0.20, unten = H * 0.56;
+
+  const punkte = stuetzen.map((s) => [
+    links + (s.x / maxX) * (rechts - links),
+    unten - ((s.h - hMin) / spanne) * (unten - oben),
+  ]);
+
+  const dicke = Math.max(5, Math.min(11, B / 90));
+  const linie = punkte.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' ');
+  const kreise = punkte
+    .map(([x, y], i) => {
+      const r = (i === 0 || i === punkte.length - 1 ? 1.25 : 0.85) * dicke;
+      return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(1)}" fill="#fff"/>`;
+    })
+    .join('');
+
+  gruppe.innerHTML =
+    `<g filter="url(#glut)"><polyline points="${linie}" fill="none" stroke="#D9327A"
+       stroke-width="${dicke.toFixed(1)}" stroke-linecap="round" stroke-linejoin="round"/></g>${kreise}`;
 }
 
 const SUPABASE = 'https://srwkwxmmhefivmvxfnos.supabase.co';
 const SCHLUESSEL = 'sb_publishable_8U2BtQi77k6PCifEmXFYDg_VxSpwhoL';
 
-/*
- * Zwei Wege zur Tour.
- *
- * Der kurze Link (?t=…) ist der Normalfall: Die Planung liegt unter einem
- * Zufalls-Token in der Datenbank, und der Link bleibt so kurz, dass man ihn
- * ohne schlechtes Gewissen verschickt. Der erste Entwurf steckte alles ins
- * Fragment (#d=…) — technisch schöner, weil nichts auf einem Server lag,
- * aber ein Vier-Tage-Trek ergab mehrere tausend Zeichen, und im Messenger
- * sah das aus wie ein Datenunfall. Solche Links funktionieren weiterhin.
- */
 function holeTour() {
   const hash = new URLSearchParams(location.hash.slice(1)).get('d');
   if (hash) return Promise.resolve(JSON.parse(ausBase64Url(hash)));
@@ -112,77 +416,164 @@ function holeTour() {
     });
 }
 
+function baueGpx(tour, etappen) {
+  const tracks = etappen.map((e, i) => {
+    const pts = e.punkte
+      .map(([la, ln]) => `      <trkpt lat="${la.toFixed(6)}" lon="${ln.toFixed(6)}"/>`)
+      .join('\n');
+    return `  <trk>\n    <name>${(i + 1)}. ${e.a} → ${e.b}</name>\n    <trkseg>\n${pts}\n    </trkseg>\n  </trk>`;
+  }).join('\n');
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="Alpencross" xmlns="http://www.topografix.com/GPX/1/1">\n  <metadata><name>${tour.n}</name>\n    <copyright author="OpenStreetMap-Mitwirkende"><license>https://opendatacommons.org/licenses/odbl/</license></copyright>\n  </metadata>\n${tracks}\n</gpx>\n`;
+}
+
 holeTour().then((tour) => {
   const etappen = (tour.s || []).map((e) => ({ ...e, punkte: entpackeLinie(e.p || '') }));
 
-  const km = etappen.reduce((a, e) => a + (e.k || 0), 0);
-  const hm = etappen.reduce((a, e) => a + (e.u || 0), 0);
+  const gesamtKm = etappen.reduce((a, e) => a + (e.k || 0), 0);
+  const gesamtAuf = etappen.reduce((a, e) => a + (e.u || 0), 0);
+  const gesamtAb = etappen.reduce((a, e) => a + (e.d || 0), 0);
+  const mehrtags = etappen.length > 1;
 
-  document.getElementById('app').innerHTML =
-    `<header><h1>${tour.n || 'Geplante Tour'}</h1>
-      <div class="meta">${etappen.length} Etappe${etappen.length === 1 ? '' : 'n'} ·
-      ${km.toFixed(1).replace('.', ',')} km · ↑ ${zahl(hm)} m</div></header>
-     <div id="map"></div>
-     <div class="inhalt" id="liste"></div>`;
+  /*
+   * Wohin es geht, in einer Zeile — der Name einer Tour sagt das nicht
+   * immer, und wer den Link bekommt, kennt die Planung noch nicht.
+   *
+   * Eine geteilte Tagestour trägt allerdings keine Ortsnamen: Die App setzt
+   * dort „Start" und „Ziel" ein. Das als Wegbeschreibung hinzuschreiben,
+   * wäre eine Zeile, die aussieht wie eine Auskunft und keine ist.
+   */
+  const platzhalter =
+    etappen.length === 1 && etappen[0].a === 'Start' && etappen[0].b === 'Ziel';
+  const vonNach = etappen.length && !platzhalter
+    ? `${sicher(etappen[0].a)} → ${sicher(etappen[etappen.length - 1].b)}`
+    : '';
 
-  const karte = L.map('map', { scrollWheelZoom: false });
-  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 17, attribution: '© OpenStreetMap-Mitwirkende',
+  document.getElementById('app').innerHTML = `
+    <header class="held">
+      ${heldBild()}
+      <div class="held-inhalt">
+        <div class="marke"><img src="icons/berge.png" alt=""> Alpencross</div>
+        <div>
+          ${vonNach ? `<div class="von-nach">${vonNach}</div>` : ''}
+          <h1>${sicher(tour.n) || 'Geplante Tour'}</h1>
+          <div class="kennzahlen">
+            ${mehrtags ? `<span class="kennzahl">${ETAPPEN_ZEICHEN} ${etappen.length} Etappen</span>` : ''}
+            <span class="kennzahl">${WEGZEICHEN} ${km(gesamtKm)} km</span>
+            <span class="kennzahl">${PFEIL_AUF} ${zahl(gesamtAuf)} hm</span>
+            <span class="kennzahl">${PFEIL_AB} ${zahl(gesamtAb)} hm</span>
+          </div>
+        </div>
+      </div>
+    </header>
+    <div class="inhalt">
+      <div class="abschnitt"><img src="icons/kompass.png" alt=""> Die Strecke</div>
+      <div id="karte"></div>
+      <div class="abschnitt"><img src="icons/wegweiser.png" alt="">
+        ${mehrtags ? 'Etappen' : platzhalter ? 'Auf einen Blick' : 'Die Tour'}</div>
+      <div id="liste"></div>
+    </div>`;
+
+  zeichneRoute(etappen);
+  // Neu rechnen, wenn sich die Breite ändert — Drehen des Telefons, Fenster
+  // ziehen. Ein Bildaufbau Verzögerung, sonst misst der Browser die alte Größe.
+  let wartet;
+  window.addEventListener('resize', () => {
+    clearTimeout(wartet);
+    wartet = setTimeout(() => zeichneRoute(etappen), 120);
+  });
+
+  const karte = L.map('karte', { scrollWheelZoom: false });
+
+  /*
+   * Topografische Karte statt der einfachen Straßenkarte.
+   *
+   * Für eine Bergtour ist das kein Geschmack, sondern Information:
+   * Höhenlinien, Schraffur und Wanderwege zeigen, was für ein Gelände das
+   * wird. Bleibt der Dienst stumm — er ist frei und entsprechend
+   * belastet —, springt die gewohnte Straßenkarte ein, statt dass jemand
+   * vor grauen Kacheln sitzt.
+   */
+  const topo = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+    maxZoom: 17,
+    attribution: '© OpenStreetMap-Mitwirkende · SRTM · Darstellung © OpenTopoMap (CC-BY-SA)',
   }).addTo(karte);
+
+  let gewechselt = false;
+  let fehler = 0;
+  topo.on('tileerror', () => {
+    if (gewechselt || ++fehler < 4) return;
+    gewechselt = true;
+    karte.removeLayer(topo);
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 17, attribution: '© OpenStreetMap-Mitwirkende',
+    }).addTo(karte);
+  });
 
   const alle = [];
   etappen.forEach((e, i) => {
     if (!e.punkte.length) return;
-    L.polyline(e.punkte, { color: '#ffffff', weight: 7, opacity: 0.9 }).addTo(karte);
-    L.polyline(e.punkte, { color: '#D9327A', weight: 4 }).addTo(karte);
+    L.polyline(e.punkte, { color: '#ffffff', weight: 8, opacity: .95 }).addTo(karte);
+    L.polyline(e.punkte, { color: '#D9327A', weight: 4.5 }).addTo(karte);
     alle.push(...e.punkte);
-    const ziel = e.punkte[e.punkte.length - 1];
-    L.marker(ziel).addTo(karte).bindPopup(`<b>${i + 1}. Etappe</b><br>${e.b}`);
+    // Nur bei mehreren Etappen nummerieren — bei einer Tagestour wäre eine
+    // „1" am Ziel nur Zierrat.
+    if (!mehrtags) return;
+    L.marker(e.punkte[e.punkte.length - 1], {
+      icon: L.divIcon({ className: '', html: `<div class="ziel-nr">${i + 1}</div>`,
+                        iconSize: [26, 26], iconAnchor: [13, 13] }),
+    }).addTo(karte).bindPopup(`<b>Etappe ${i + 1}</b><br>${sicher(e.b)}`);
   });
+
   /*
    * Erst messen, dann einpassen.
    *
    * Die Karte entsteht in einem Element, das der Browser gerade erst
-   * eingehängt hat — Leaflet misst dann null Höhe und rechnet die
-   * Zoomstufe für eine Fläche von 0×0 aus. Ergebnis war die Weltkarte mit
-   * einem Stecknadelkopf irgendwo in Europa. `invalidateSize` misst neu,
-   * und das Einpassen wartet einen Bildaufbau lang.
+   * eingehängt hat — Leaflet misst dann null Höhe und rechnet die Zoomstufe
+   * für eine Fläche von 0×0 aus. Ergebnis war die Weltkarte mit einem
+   * Stecknadelkopf irgendwo in Europa.
    */
   if (alle.length) {
     const grenzen = L.latLngBounds(alle).pad(0.12);
     karte.fitBounds(grenzen);
-    requestAnimationFrame(() => {
-      karte.invalidateSize();
-      karte.fitBounds(grenzen);
-    });
-    window.addEventListener('load', () => {
-      karte.invalidateSize();
-      karte.fitBounds(grenzen);
-    });
+    requestAnimationFrame(() => { karte.invalidateSize(); karte.fitBounds(grenzen); });
+    window.addEventListener('load', () => { karte.invalidateSize(); karte.fitBounds(grenzen); });
+  } else {
+    karte.setView([46.8, 10.5], 8);
   }
 
   const liste = document.getElementById('liste');
   liste.innerHTML = etappen.map((e, i) => `
     <div class="etappe">
-      <div class="nr">Etappe ${i + 1}</div>
-      <div class="weg">${e.a} → ${e.b}</div>
+      ${mehrtags ? `<div class="nr">Etappe ${i + 1}</div>` : ''}
+      ${platzhalter ? '' : `<div class="weg">${sicher(e.a)} → ${sicher(e.b)}</div>`}
       <div class="zahlen">
-        <span class="chip">${(e.k || 0).toFixed(1).replace('.', ',')} km</span>
-        <span class="chip auf">↑ ${zahl(e.u || 0)} m</span>
-        <span class="chip ab">↓ ${zahl(e.d || 0)} m</span>
+        <span class="chip">${WEGZEICHEN} ${km(e.k)} km</span>
+        <span class="chip auf">${PFEIL_AUF} ${zahl(e.u || 0)} hm</span>
+        <span class="chip ab">${PFEIL_AB} ${zahl(e.d || 0)} hm</span>
       </div>
-      ${e.h && e.h.length ? `<div class="huetten">Unterwegs: ${e.h.join(' · ')}</div>` : ''}
+      ${e.h && e.h.length
+        ? `<div class="huetten"><img src="icons/huetten.png" alt="">
+             <div>Unterwegs: ${e.h.map(sicher).join(' · ')}</div></div>`
+        : ''}
     </div>`).join('');
 
   const gpx = baueGpx(tour, etappen);
   const url = URL.createObjectURL(new Blob([gpx], { type: 'application/gpx+xml' }));
   const name = (tour.n || 'tour').replace(/[^\w-]+/g, '-');
   liste.insertAdjacentHTML('beforeend',
-    `<a class="laden" href="${url}" download="${name}.gpx">↓ Als GPX herunterladen</a>
-     <div class="fuss">Geplant mit Alpencross. Kartendaten © OpenStreetMap-Mitwirkende.</div>`);
+    `<a class="laden" href="${url}" download="${name}.gpx">
+       <img src="icons/wanderstiefel.png" alt=""> Als GPX herunterladen</a>
+     <div class="fuss">Geplant mit Alpencross.<br>
+       Kartendaten © OpenStreetMap-Mitwirkende.</div>`);
 }).catch((e) => {
-  document.getElementById('app').innerHTML =
-    `<div class="fehler">Dieser Link enthält keine lesbare Tour.<br><br>${e.message}</div>`;
+  document.getElementById('app').innerHTML = `
+    <div class="zustand">
+      <img src="icons/wegweiser.png" alt="">
+      <h2>Hier ist keine Tour</h2>
+      <p>${sicher(e.message)}<br><br>
+        Geteilte Touren laufen nach drei Monaten ab. Frag noch einmal nach
+        einem frischen Link.</p>
+    </div>`;
 });
 </script>
 </body>
