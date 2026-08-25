@@ -416,14 +416,47 @@ function holeTour() {
     });
 }
 
+/* Höhen aus dem geteilten Datensatz — dieselbe Delta-Kette wie die Linie,
+   nur eindimensional. Fehlt das Feld (ältere Links), gibt es keine Höhen. */
+function entpackeHoehen(str) {
+  if (!str) return null;
+  const aus = [];
+  let i = 0, h = 0;
+  while (i < str.length) {
+    let ergebnis = 0, schritt = 0, b;
+    do { b = str.charCodeAt(i++) - 63; ergebnis |= (b & 0x1f) << schritt; schritt += 5; } while (b >= 0x20);
+    h += (ergebnis & 1) ? ~(ergebnis >> 1) : (ergebnis >> 1);
+    aus.push(h);
+  }
+  return aus;
+}
+
+/* Maskierung für XML.
+   Nicht dieselbe wie `sicher()` für die Anzeige: Ein Tourenname mit einem
+   kaufmännischen Und — "Kreuzboden & Almagellerhorn" — erzeugte hier bisher
+   kaputtes XML, und eine fremde App lehnt die Datei dann komplett ab statt
+   sie halb zu lesen. Genau so klang die Rückmeldung: "es ging irgendwie
+   nicht". */
+function xml(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&apos;');
+}
+
 function baueGpx(tour, etappen) {
   const tracks = etappen.map((e, i) => {
+    const hoehen = entpackeHoehen(e.e);
     const pts = e.punkte
-      .map(([la, ln]) => `      <trkpt lat="${la.toFixed(6)}" lon="${ln.toFixed(6)}"/>`)
+      .map(([la, ln], k) => {
+        const h = hoehen && hoehen[k] != null ? hoehen[k] : null;
+        return h != null
+          ? `      <trkpt lat="${la.toFixed(6)}" lon="${ln.toFixed(6)}"><ele>${h.toFixed(1)}</ele></trkpt>`
+          : `      <trkpt lat="${la.toFixed(6)}" lon="${ln.toFixed(6)}"/>`;
+      })
       .join('\n');
-    return `  <trk>\n    <name>${(i + 1)}. ${e.a} → ${e.b}</name>\n    <trkseg>\n${pts}\n    </trkseg>\n  </trk>`;
+    return `  <trk>\n    <name>${xml(`${i + 1}. ${e.a} → ${e.b}`)}</name>\n    <trkseg>\n${pts}\n    </trkseg>\n  </trk>`;
   }).join('\n');
-  return `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="Alpencross" xmlns="http://www.topografix.com/GPX/1/1">\n  <metadata><name>${tour.n}</name>\n    <copyright author="OpenStreetMap-Mitwirkende"><license>https://opendatacommons.org/licenses/odbl/</license></copyright>\n  </metadata>\n${tracks}\n</gpx>\n`;
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="Alpencross" xmlns="http://www.topografix.com/GPX/1/1">\n  <metadata><name>${xml(tour.n)}</name>\n    <copyright author="OpenStreetMap-Mitwirkende"><license>https://opendatacommons.org/licenses/odbl/</license></copyright>\n  </metadata>\n${tracks}\n</gpx>\n`;
 }
 
 holeTour().then((tour) => {
