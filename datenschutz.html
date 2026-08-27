@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Alpencross – Datenschutz</title>
+<meta name="theme-color" content="#0A2028">
+<link rel="icon" href="icons/berge.png">
+<style>
+  /*
+   * Dieselbe Sprache wie die Tour- und die Live-Seite.
+   *
+   * Eine Datenschutzerklärung wird gelesen, wenn jemand misstrauisch ist —
+   * im App Store, vor dem Kauf, oder nachdem er die Standortabfrage gesehen
+   * hat. Sie muss deshalb zwei Dinge gleichzeitig können: vollständig sein
+   * und beim Überfliegen die eine Frage beantworten, die alle haben. Die
+   * steht deshalb ganz oben und in einem Satz.
+   */
+  :root {
+    --tinte:#10333D; --weich:#5C7079; --leise:#7A8A93;
+    --petrol:#0E9AA5; --petrol-tief:#0E5E66;
+    --papier:#F2F7F8; --karte:#FFFFFF; --rand:#E1EBED;
+    --schatten:0 2px 14px rgba(14,42,51,.09);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --tinte:#E8F1F3; --weich:#9DAEB5; --leise:#7E9099;
+      --papier:#0B1B21; --karte:#122831; --rand:#1E3944;
+      --schatten:0 2px 14px rgba(0,0,0,.4);
+    }
+  }
+  * { box-sizing:border-box; }
+  body {
+    margin:0; background:var(--papier); color:var(--tinte);
+    font:16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .blatt { max-width:760px; margin:0 auto; padding:40px 20px 80px; }
+  .marke { font-size:12px; letter-spacing:.12em; text-transform:uppercase; color:var(--petrol); margin:0 0 10px; }
+  h1 { font-size:30px; line-height:1.15; margin:0 0 8px; letter-spacing:-.02em; }
+  .stand { color:var(--leise); font-size:14px; margin:0 0 28px; }
+  .kern {
+    background:var(--karte); border-radius:14px; padding:20px 22px;
+    box-shadow:var(--schatten); margin:0 0 32px;
+  }
+  .kern p { margin:0; font-size:17px; line-height:1.55; }
+  h2 { font-size:19px; margin:34px 0 10px; letter-spacing:-.01em; }
+  h3 { font-size:16px; margin:22px 0 6px; }
+  p, li { color:var(--weich); }
+  p { margin:0 0 12px; }
+  ul { margin:0 0 12px; padding-left:20px; }
+  li { margin:0 0 6px; }
+  strong { color:var(--tinte); }
+  .tabelle { width:100%; border-collapse:collapse; margin:14px 0 20px; font-size:14px; display:block; overflow-x:auto; }
+  .tabelle th, .tabelle td { text-align:left; padding:9px 10px; border-bottom:1px solid var(--rand); vertical-align:top; }
+  .tabelle th { color:var(--tinte); font-weight:700; white-space:nowrap; }
+  .tabelle td { color:var(--weich); }
+  .entwurf {
+    background:#F6E7D6; color:#8A4A12; border-radius:12px; padding:16px 18px;
+    font-size:14px; line-height:1.5; margin:0 0 28px;
+  }
+  @media (prefers-color-scheme: dark) { .entwurf { background:#33241a; color:#E0A870; } }
+  footer { margin-top:44px; padding-top:18px; border-top:1px solid var(--rand); color:var(--leise); font-size:13px; }
+  a { color:var(--petrol-tief); }
+  @media (prefers-color-scheme: dark) { a { color:var(--petrol); } }
+</style>
+</head>
+<body>
+<div class="blatt">
+
+<p class="marke">Alpencross</p>
+<h1>Datenschutz</h1>
+<p class="stand">Stand: 27. August 2026</p>
+
+<div class="entwurf">
+  <strong>Entwurf.</strong> Die technischen Angaben stammen aus dem Quelltext der App und sind
+  vollständig. Der verantwortliche Name, die Anschrift und die Kontaktadresse müssen noch
+  eingetragen werden, und die rechtliche Prüfung steht aus.
+</div>
+
+<div class="kern">
+  <p>
+    <strong>Deine Touren, dein Gipfelbuch, deine Fotos und deine Aufzeichnungen verlassen dein
+    Gerät nicht.</strong> Sie liegen als Dateien auf dem Telefon. Es gibt keine Werbung, kein
+    Tracking und keine Analyse-Werkzeuge in dieser App.
+  </p>
+</div>
+
+<h2>Was auf dem Gerät bleibt</h2>
+<p>
+  Gespeicherte und geplante Touren, aufgezeichnete Spuren mit Höhenprofil, das Gipfelbuch,
+  Höhenpunkte und Herausforderungen, eigene Fotos, alle Einstellungen sowie die heruntergeladenen
+  Karten-, Höhen- und Wegedaten. Nichts davon wird irgendwohin gesendet, solange du es nicht
+  ausdrücklich tust.
+</p>
+
+<h2>Was das Gerät sendet — und wann</h2>
+<p>
+  Für Karte, Wetter und Suche fragt die App bei Dritten an. Dabei werden Koordinaten übertragen:
+  ohne den Ort gibt es keine Karte und keine Vorhersage. Ein Konto ist dafür nicht nötig, und es
+  wird keine Kennung mitgeschickt, die dich wiedererkennbar macht.
+</p>
+
+<table class="tabelle">
+  <tr><th>Empfänger</th><th>Wofür</th><th>Was übertragen wird</th></tr>
+  <tr><td>Mapbox (USA)</td><td>Kartenbild, Ortssuche, Umkehrsuche, Vorschaubild beim Teilen</td><td>Kartenausschnitt bzw. Koordinaten, Suchbegriff</td></tr>
+  <tr><td>MET Norway (Norwegen)</td><td>Wettervorhersage</td><td>Koordinaten, auf drei Nachkommastellen gerundet, dazu die Kennung „Alpencross“</td></tr>
+  <tr><td>Open-Meteo (Deutschland)</td><td>Höhenangabe, wenn kein Höhenmodell geladen ist</td><td>Koordinaten</td></tr>
+  <tr><td>OpenStreetMap / Nominatim</td><td>Ortssuche</td><td>Suchbegriff</td></tr>
+  <tr><td>Amazon S3 (offene Höhendaten)</td><td>Höhenkacheln für Gegenden ohne vorbereitete Daten</td><td>Kachelnummern, keine genaue Position</td></tr>
+  <tr><td>Cloudflare R2 (EU)</td><td>Wegenetz-, Höhen- und Objektkacheln</td><td>Kachelnummern, keine genaue Position</td></tr>
+  <tr><td>Wikipedia / Wikidata</td><td>Beschreibungen zu Gipfeln und Hütten</td><td>Koordinaten bzw. Artikeltitel</td></tr>
+  <tr><td>Supabase (EU, Frankfurt)</td><td><strong>nur</strong> Tour teilen, Live-Standort, Konto-Abgleich</td><td>siehe unten</td></tr>
+</table>
+
+<h2>Was nur auf deine Handlung hin passiert</h2>
+
+<h3>Eine Tour teilen</h3>
+<p>
+  Beim Teilen wird die Tour — Streckenpunkte, Höhen, Name — auf unseren Server geladen und ist
+  unter einer zufälligen Adresse abrufbar. Wer die Adresse hat, sieht die Tour; ein Konto braucht
+  er nicht. Nach <strong>drei Monaten</strong> läuft die Adresse ab, sieben Tage später wird der
+  Eintrag gelöscht.
+</p>
+
+<h3>Live-Standort teilen</h3>
+<p>
+  Solange das Teilen läuft, sendet die App etwa jede Minute deine Position, Höhe und — wenn du
+  eine angegeben hast — deine geplante Rückmeldezeit. Wer den Link hat, sieht sie. Es wird immer
+  nur der <em>letzte</em> Stand gespeichert, keine Spur.
+</p>
+<p>
+  <strong>Der Link läuft ab.</strong> Ohne Rückmeldezeit endet er 24 Stunden nach der letzten
+  Meldung; mit Rückmeldezeit zwölf Stunden nach dieser Zeit. Spätestens nach 48 Stunden wird der
+  Eintrag gelöscht. Jede neue Freigabe bekommt eine neue Adresse — ein alter Link zeigt danach
+  nichts mehr. „Teilen beenden“ löscht den Eintrag sofort.
+</p>
+
+<h3>Konto</h3>
+<p>
+  Ein Konto ist freiwillig und wird nur gebraucht, um Touren und Gipfelbuch zwischen eigenen
+  Geräten abzugleichen. Gespeichert werden dann die E-Mail-Adresse, ein frei wählbarer Anzeigename
+  und die abgeglichenen Touren und Besuche. Die Anmeldung läuft über einen Code per E-Mail; ein
+  Passwort gibt es nicht.
+</p>
+
+<h2>Berechtigungen auf dem Telefon</h2>
+<ul>
+  <li><strong>Standort</strong> — für Karte, Aufzeichnung, Notfallkarte und Live-Teilen. Ohne ihn
+      funktioniert die App als Kartenbetrachter weiter.</li>
+  <li><strong>Standort im Hintergrund</strong> — nur während einer laufenden Aufzeichnung, damit
+      die Spur nicht abreißt, wenn der Bildschirm aus ist. Der blaue Balken in der Statusleiste
+      zeigt es an.</li>
+  <li><strong>Bewegungssensoren</strong> — für den Gipfelfinder, der die Kamerarichtung braucht.</li>
+  <li><strong>Kamera und Fotos</strong> — nur, wenn du ein Foto zu einer Tour ablegst. Die Bilder
+      bleiben auf dem Gerät.</li>
+</ul>
+
+<h2>Rechtsgrundlagen, Speicherdauer, deine Rechte</h2>
+<p>
+  Die Abfragen bei Dritten stützen sich auf Art. 6 Abs. 1 lit. b DSGVO — ohne sie lässt sich die
+  App nicht wie beschrieben nutzen. Teilen, Live-Standort und Konto beruhen auf deiner
+  Einwilligung (lit. a); du erteilst sie durch die jeweilige Handlung und kannst sie jederzeit
+  widerrufen, indem du das Teilen beendest oder das Konto löschst.
+</p>
+<p>
+  Du hast das Recht auf Auskunft, Berichtigung, Löschung, Einschränkung der Verarbeitung,
+  Datenübertragbarkeit und Widerspruch sowie das Recht, dich bei einer Aufsichtsbehörde zu
+  beschweren. Was auf dem Gerät liegt, löschst du selbst — indem du die App löschst.
+</p>
+<p>
+  Mapbox verarbeitet Daten in den USA. Die Übermittlung stützt sich auf die
+  EU-Standardvertragsklauseln.
+</p>
+
+<h2>Verantwortlich</h2>
+<p>
+  <em>[Name, Anschrift und E-Mail-Adresse eintragen.]</em>
+</p>
+
+<footer>
+  Kartendaten © OpenStreetMap-Mitwirkende (ODbL) · Höhendaten aus offenen Quellen ·
+  Wetterdaten © MET Norway · Beschreibungen aus Wikipedia (CC BY-SA)
+</footer>
+
+</div>
+</body>
+</html>
