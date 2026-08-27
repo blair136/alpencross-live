@@ -339,7 +339,25 @@
 
       haupt.textContent = 'Unterwegs seit ' + uhr(p.gestartet) + ' Uhr';
 
-      var teile = ['<span class="chip">' + UHR + ' ' + zeit(p.aktualisiert) + '</span>'];
+      /*
+       * Wie lange ist das letzte Signal her?
+       *
+       * Der gefährlichste Zustand dieser Seite war der stille: Wer ohne
+       * Rückmeldezeit teilt und dann stürzt, dessen Telefon hört einfach auf
+       * zu melden — und die Seite zeigte weiter „Unterwegs seit 09:12" mit
+       * der letzten Position. Sie sah lebendig aus. Genau dafür gibt es sie
+       * aber nicht.
+       *
+       * Die App meldet sich jede Minute, solange sie Empfang hat. Eine
+       * Dreiviertelstunde Stille ist also entweder ein Funkloch oder etwas
+       * anderes — und beides muss dastehen, nicht nur das eine.
+       */
+      var stillMin = Math.round((Date.now() - new Date(p.aktualisiert).getTime()) / 60000);
+      var STILL_HINWEIS = 45;
+      var STILL_ALARM = 150;
+
+      var teile = ['<span class="chip' + (stillMin >= STILL_HINWEIS ? ' spaet' : '') + '">' +
+        UHR + ' ' + zeit(p.aktualisiert) + '</span>'];
       if (p.ele != null) {
         teile.push('<span class="chip">' + GIPFEL + ' ' + p.ele + ' m</span>');
       }
@@ -349,11 +367,32 @@
        * meldet sie sich selbst, wenn jemand nicht zurück ist — genau dann
        * braucht es eine Entscheidung, und niemand starrt auf den Bildschirm.
        */
+      var stilleGemeldet = false;
+      if (stillMin >= STILL_HINWEIS) {
+        // Beide Erklärungen nennen. Wer nur „kein Signal" liest, denkt an
+        // einen Fehler der Seite; wer nur „Alarm" liest, ruft beim ersten
+        // Funkloch die Bergrettung.
+        var stilleText =
+          'Seit ' + dauer(stillMin) + ' kein Signal. Das kann ein Funkloch sein — ' +
+          'die App meldet sich sonst jede Minute.';
+        if (stillMin >= STILL_ALARM) {
+          document.getElementById('alarmText').textContent = stilleText;
+          document.getElementById('alarmOrt').textContent =
+            'Letzte Position: ' + p.lat.toFixed(5) + ', ' + p.lng.toFixed(5) +
+            (p.ele != null ? ' · ' + p.ele + ' m' : '');
+          alarm.classList.remove('versteckt');
+          stilleGemeldet = true;
+        } else {
+          leise.textContent = stilleText;
+          leise.classList.remove('versteckt');
+        }
+      }
+
       if (p.zurueck_um) {
         var restMin = Math.round((new Date(p.zurueck_um).getTime() - Date.now()) / 60000);
         if (restMin >= 0) {
           teile.push('<span class="chip">' + ZIEL + ' zurück gegen ' + uhr(p.zurueck_um) + ' Uhr</span>');
-          alarm.classList.add('versteckt');
+          if (!stilleGemeldet) alarm.classList.add('versteckt');
         } else {
           var ueber = Math.abs(restMin);
           teile.push('<span class="chip spaet">' + ZIEL + ' überfällig seit ' + dauer(ueber) + '</span>');
