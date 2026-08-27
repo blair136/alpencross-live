@@ -149,6 +149,10 @@
     background:linear-gradient(135deg, var(--petrol) 0%, var(--petrol-tief) 100%);
     padding:16px; border-radius:14px; margin-top:20px;
     box-shadow:0 4px 16px rgba(14,94,102,.32);
+    /* Gilt für <a> und <button> gleichermaßen: Auf dem Telefon ist es ein
+       Knopf, der das Teilen-Blatt öffnet, auf dem Rechner ein Link, der
+       herunterlädt. Aussehen soll beides dasselbe. */
+    width:100%; border:0; font-family:inherit; cursor:pointer; appearance:none;
   }
   .laden img { width:24px; height:24px; filter:invert(1); }
 
@@ -456,7 +460,7 @@ function baueGpx(tour, etappen) {
       .join('\n');
     return `  <trk>\n    <name>${xml(`${i + 1}. ${e.a} → ${e.b}`)}</name>\n    <trkseg>\n${pts}\n    </trkseg>\n  </trk>`;
   }).join('\n');
-  return `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="Alpencross" xmlns="http://www.topografix.com/GPX/1/1">\n  <metadata><name>${xml(tour.n)}</name>\n    <copyright author="OpenStreetMap-Mitwirkende"><license>https://opendatacommons.org/licenses/odbl/</license></copyright>\n  </metadata>\n${tracks}\n</gpx>\n`;
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="Alpencross" xmlns="http://www.topografix.com/GPX/1/1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd">\n  <metadata><name>${xml(tour.n)}</name>\n    <copyright author="OpenStreetMap-Mitwirkende"><license>https://opendatacommons.org/licenses/odbl/</license></copyright>\n  </metadata>\n${tracks}\n</gpx>\n`;
 }
 
 holeTour().then((tour) => {
@@ -590,14 +594,45 @@ holeTour().then((tour) => {
         : ''}
     </div>`).join('');
 
+  /*
+   * Die Datei weitergeben — auf dem Telefon über das Teilen-Blatt.
+   *
+   * Vorher stand hier nur ein `<a download>` auf eine Blob-Adresse. Auf dem
+   * iPhone ist das die bekannte Sackgasse: Safari legt die Datei ohne
+   * brauchbaren Namen ab, die Endung geht verloren, und die Wander-App
+   * bietet sie beim Importieren gar nicht erst an. Genau so wurde es
+   * gemeldet — „es ging irgendwie nicht", während dieselbe Datei auf dem
+   * Rechner einwandfrei war.
+   *
+   * Mit dem Teilen-Blatt entfällt der Umweg über die Dateien-App ganz: Die
+   * Zielanwendung steht direkt darin, und Name und Typ bleiben erhalten.
+   * Wo es das nicht gibt (Rechner), bleibt es beim Herunterladen.
+   */
   const gpx = baueGpx(tour, etappen);
-  const url = URL.createObjectURL(new Blob([gpx], { type: 'application/gpx+xml' }));
   const name = (tour.n || 'tour').replace(/[^\w-]+/g, '-');
-  liste.insertAdjacentHTML('beforeend',
-    `<a class="laden" href="${url}" download="${name}.gpx">
-       <img src="icons/wanderstiefel.png" alt=""> Als GPX herunterladen</a>
-     <div class="fuss">Geplant mit Alpencross.<br>
-       Kartendaten © OpenStreetMap-Mitwirkende.</div>`);
+  const datei = new File([gpx], name + '.gpx', { type: 'application/gpx+xml' });
+  const kannTeilen =
+    typeof navigator.canShare === 'function' && navigator.canShare({ files: [datei] });
+
+  if (kannTeilen) {
+    liste.insertAdjacentHTML('beforeend',
+      `<button class="laden" id="gpxTeilen" type="button">
+         <img src="icons/wanderstiefel.png" alt=""> GPX an eine App übergeben</button>
+       <div class="fuss">Geplant mit Alpencross.<br>
+         Kartendaten © OpenStreetMap-Mitwirkende.</div>`);
+    document.getElementById('gpxTeilen').addEventListener('click', function () {
+      navigator.share({ files: [datei], title: name + '.gpx' }).catch(function () {
+        // Abgebrochen oder abgelehnt — dann bleibt der Weg über Herunterladen.
+      });
+    });
+  } else {
+    const url = URL.createObjectURL(new Blob([gpx], { type: 'application/gpx+xml' }));
+    liste.insertAdjacentHTML('beforeend',
+      `<a class="laden" href="${url}" download="${name}.gpx">
+         <img src="icons/wanderstiefel.png" alt=""> Als GPX herunterladen</a>
+       <div class="fuss">Geplant mit Alpencross.<br>
+         Kartendaten © OpenStreetMap-Mitwirkende.</div>`);
+  }
 }).catch((e) => {
   document.getElementById('app').innerHTML = `
     <div class="zustand">
