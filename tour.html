@@ -143,6 +143,22 @@
   .huetten img { width:19px; height:19px; opacity:.65; flex-shrink:0; margin-top:1px; }
   @media (prefers-color-scheme: dark) { .huetten img { filter:invert(1); opacity:.6; } }
 
+  /* Gelände: dieselbe Zeilenform wie die Hütten, aber mit Gewicht — es ist
+     die einzige Angabe hier, die jemanden vom Losgehen abhalten soll. */
+  .gelaende {
+    display:flex; align-items:flex-start; gap:8px;
+    font-size:13.5px; line-height:1.5; margin-top:11px;
+    color:#7A5A1E; background:rgba(190,145,40,.10);
+    border-radius:9px; padding:9px 11px;
+  }
+  .gelaende.deutlich { color:#9C2F1F; background:rgba(181,48,31,.10); }
+  .gelaende img { width:18px; height:18px; opacity:.7; flex-shrink:0; margin-top:1px; }
+  @media (prefers-color-scheme: dark) {
+    .gelaende { color:#E0BE72; background:rgba(190,145,40,.14); }
+    .gelaende.deutlich { color:#F0A08E; background:rgba(181,48,31,.16); }
+    .gelaende img { filter:invert(1); opacity:.6; }
+  }
+
   /* Die Zahl ohne diesen Satz liest sich wie eine Zusage. */
   .zeithinweis {
     font-size:13px; color:var(--weich); line-height:1.5;
@@ -190,6 +206,7 @@
   </div>
 </div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="gelaende.js"></script>
 <script>
 /*
  * Geplante Tour aus dem Link.
@@ -246,6 +263,15 @@ function zeit(min) {
 /* Aus fremdem Text wird hier Auszeichnung gebaut — Tourennamen und
    Hüttennamen kommen aus einem geteilten Datensatz und dürfen kein Markup
    einschleusen. */
+/* Der Geländesatz zu einer Etappe — das Urteil steht in `gelaende.js`,
+   damit `gelaende.test.mjs` es ohne Browser nachrechnen kann. */
+function gelaendeBlock(e) {
+  var h = Gelaende.gelaendeHinweis(e);
+  if (!h) return '';
+  return '<div class="gelaende' + (h.deutlich ? ' deutlich' : '') + '">' +
+    '<img src="icons/berge.png" alt=""><div>' + sicher(h.text) + '</div></div>';
+}
+
 function sicher(s) {
   return String(s == null ? '' : s).replace(/[&<>"']/g, (c) =>
     ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
@@ -617,6 +643,7 @@ holeTour().then((tour) => {
         <span class="chip ab">${PFEIL_AB} ${zahl(e.d || 0)} hm</span>
         ${zeit(e.g) ? `<span class="chip">${UHR_ZEICHEN} ${zeit(e.g)}</span>` : ''}
       </div>
+      ${gelaendeBlock(e)}
       ${e.h && e.h.length
         ? `<div class="huetten"><img src="icons/huetten.png" alt="">
              <div>Unterwegs: ${e.h.map(sicher).join(' · ')}</div></div>`

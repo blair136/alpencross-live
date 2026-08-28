@@ -18,9 +18,14 @@ Die Entscheidung, ob die Seite Alarm zeigt oder Entwarnung gibt, liegt in
 nachrechenbar ist:
 
 ```
-node --test urteil.test.mjs
+node --test urteil.test.mjs gelaende.test.mjs
 ```
 
-Das ist die einzige Prüfung dieses Verzeichnisses, und sie deckt genau den
-Teil ab, an dem etwas hängt: Stille, Überfälligkeit, verschobene Frist und
-der Unterschied zwischen „beendet" und „ausgelaufen".
+`urteil.js` deckt die Live-Seite ab: Stille, Überfälligkeit, verschobene
+Frist und der Unterschied zwischen „beendet" und „ausgelaufen".
+`gelaende.js` deckt die geteilte Tour ab: wann Steilheit genannt wird,
+wann hervorgehoben — und wann eine halb geprüfte Strecke als ungeprüft
+dastehen muss statt als flach.
+
+Beide Dateien liegen getrennt von der Anzeige, damit genau die Stellen
+ohne Browser nachrechenbar sind, an denen etwas hängt.
