@@ -143,6 +143,12 @@
   .huetten img { width:19px; height:19px; opacity:.65; flex-shrink:0; margin-top:1px; }
   @media (prefers-color-scheme: dark) { .huetten img { filter:invert(1); opacity:.6; } }
 
+  /* Die Zahl ohne diesen Satz liest sich wie eine Zusage. */
+  .zeithinweis {
+    font-size:13px; color:var(--weich); line-height:1.5;
+    margin:14px 2px 0; max-width:56ch;
+  }
+
   .laden {
     display:flex; align-items:center; justify-content:center; gap:10px;
     text-decoration:none; color:#fff; font-weight:800; font-size:16px;
@@ -223,6 +229,20 @@ function entpackeLinie(str) {
 
 function zahl(n) { return n.toLocaleString('de-DE'); }
 function km(n) { return (n || 0).toFixed(1).replace('.', ','); }
+
+/*
+ * Gehzeit als 5:10 h.
+ *
+ * Die Minuten kommen fertig aus der App. Hier wird bewusst nichts
+ * nachgerechnet — weder Pausen noch ein eigenes Tempo: Dieselbe Größe an
+ * zwei Stellen zu rechnen ist der zuverlässigste Weg, dass die beiden
+ * Zahlen irgendwann auseinanderlaufen und keiner mehr weiß, welche gilt.
+ */
+function zeit(min) {
+  if (!min || min <= 0) return null;
+  var h = Math.floor(min / 60), m = min % 60;
+  return h + ':' + (m < 10 ? '0' : '') + m + ' h';
+}
 /* Aus fremdem Text wird hier Auszeichnung gebaut — Tourennamen und
    Hüttennamen kommen aus einem geteilten Datensatz und dürfen kein Markup
    einschleusen. */
@@ -236,6 +256,7 @@ function sicher(s) {
 const PFEIL_AUF = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 13V3M8 3 3.5 7.5M8 3l4.5 4.5" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 const PFEIL_AB  = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 3v10M8 13l-4.5-4.5M8 13l4.5-4.5" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 const WEGZEICHEN = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M1.5 11c2-3.5 3.2 2 5-1.5S10.5 3 14.5 5.5" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const UHR_ZEICHEN = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="6.2" stroke="currentColor" stroke-width="2.1"/><path d="M8 4.6V8l2.4 1.6" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 const ETAPPEN_ZEICHEN = '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="3" cy="12.5" r="2.2" fill="currentColor"/><circle cx="13" cy="3.5" r="2.2" fill="currentColor"/><path d="M4.6 11 11.4 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-dasharray="0.1 3.2"/></svg>';
 
 /**
@@ -469,6 +490,12 @@ holeTour().then((tour) => {
   const gesamtKm = etappen.reduce((a, e) => a + (e.k || 0), 0);
   const gesamtAuf = etappen.reduce((a, e) => a + (e.u || 0), 0);
   const gesamtAb = etappen.reduce((a, e) => a + (e.d || 0), 0);
+  // Nur wenn jede Etappe eine Zeit mitbringt — eine Summe über Lücken
+  // wäre zu niedrig, und zu niedrig ist bei Gehzeiten die gefährliche
+  // Richtung. Ältere Links haben das Feld nicht.
+  const gesamtMin = etappen.every((e) => e.g > 0)
+    ? etappen.reduce((a, e) => a + e.g, 0)
+    : 0;
   const mehrtags = etappen.length > 1;
 
   /*
@@ -498,6 +525,7 @@ holeTour().then((tour) => {
             <span class="kennzahl">${WEGZEICHEN} ${km(gesamtKm)} km</span>
             <span class="kennzahl">${PFEIL_AUF} ${zahl(gesamtAuf)} hm</span>
             <span class="kennzahl">${PFEIL_AB} ${zahl(gesamtAb)} hm</span>
+            ${zeit(gesamtMin) ? `<span class="kennzahl">${UHR_ZEICHEN} ${zeit(gesamtMin)}</span>` : ''}
           </div>
         </div>
       </div>
@@ -587,12 +615,20 @@ holeTour().then((tour) => {
         <span class="chip">${WEGZEICHEN} ${km(e.k)} km</span>
         <span class="chip auf">${PFEIL_AUF} ${zahl(e.u || 0)} hm</span>
         <span class="chip ab">${PFEIL_AB} ${zahl(e.d || 0)} hm</span>
+        ${zeit(e.g) ? `<span class="chip">${UHR_ZEICHEN} ${zeit(e.g)}</span>` : ''}
       </div>
       ${e.h && e.h.length
         ? `<div class="huetten"><img src="icons/huetten.png" alt="">
              <div>Unterwegs: ${e.h.map(sicher).join(' · ')}</div></div>`
         : ''}
-    </div>`).join('');
+    </div>`).join('')
+    // Ohne diesen Satz liest sich die Zahl wie eine Zusage. Der Nutzer-
+    // Research ist voll von Rezensionen, die genau daran hängen: angezeigte
+    // Zeiten, die für ein Tempo galten, das der Leser nicht geht.
+    + (etappen.some((e) => e.g > 0)
+      ? `<p class="zeithinweis">Gehzeiten nach der DAV-Formel bei normalem Tempo
+           — ohne Pausen. Rechne Rast, Fotostopps und Gegenverkehr dazu.</p>`
+      : '');
 
   /*
    * Die Datei weitergeben — auf dem Telefon über das Teilen-Blatt.
