@@ -212,6 +212,7 @@
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="urteil.js"></script>
 <script>
   var URL_BASIS = 'https://srwkwxmmhefivmvxfnos.supabase.co';
   var KEY = 'sb_publishable_8U2BtQi77k6PCifEmXFYDg_VxSpwhoL';
@@ -249,6 +250,30 @@
   var saum = L.polyline([], { color: '#ffffff', weight: 8, opacity: .9 }).addTo(karte);
   var spur = L.polyline([], { color: '#0E9AA5', weight: 4.5 }).addTo(karte);
   var marker = null, ersterFix = true;
+
+  /*
+   * Wann kam zuletzt ein Lebenszeichen an?
+   *
+   * Verschwindet die Zeile, heißt das zweierlei: Der Wandernde hat „Teilen
+   * beenden" gedrückt — dann war das letzte Signal Minuten alt. Oder die
+   * Freigabe ist verfallen, weil seit Stunden nichts mehr kam — dann war
+   * sie längst still. Beides sah bisher gleich aus, und die Seite gab in
+   * beiden Fällen Entwarnung. Der zweite Fall ist der gefährlichste, den
+   * diese Seite kennt; er darf nicht wie der harmloseste aussehen.
+   *
+   * Im Speicher des Browsers, damit ein Neuladen es nicht vergisst.
+   */
+  var SIGNAL_SCHLUESSEL = 'letztesSignal:' + token;
+
+  function merkeSignal(iso) {
+    try { localStorage.setItem(SIGNAL_SCHLUESSEL, iso); } catch (e) { /* privates Fenster */ }
+  }
+  function gespeichertesSignal() {
+    try {
+      var v = localStorage.getItem(SIGNAL_SCHLUESSEL);
+      return v ? new Date(v).getTime() : null;
+    } catch (e) { return null; }
+  }
 
   /*
    * Der Karte folgen, bis jemand sie selbst anfasst.
@@ -308,19 +333,40 @@
       var alarm = document.getElementById('alarm');
       var p = rows && rows[0];
 
+      // Was gilt, entscheidet `urteil.js` — dieselbe Datei, die
+      // `urteil.test.mjs` in Node nachrechnet. Hier steht nur noch, wie es
+      // aussieht. Vorher hing die Entscheidung zwischen `classList`-Aufrufen
+      // und war nur im Browser prüfbar; zwei Fehler haben genau dort gesessen.
+      var u = Urteil.beurteile(p, Date.now(), gespeichertesSignal());
+      var alarmText = document.getElementById('alarmText');
+      var alarmOrt = document.getElementById('alarmOrt');
+
+      alarm.classList.add('versteckt');
+      leise.classList.add('versteckt');
+
       if (!p) {
         herz.classList.add('still');
-        haupt.textContent = 'Kein aktives Teilen';
         chips.innerHTML = '';
-        leise.textContent =
-          'Die Wanderung ist beendet oder der Link abgelaufen. Die zuletzt gezeigte Spur bleibt stehen.';
-        leise.classList.remove('versteckt');
-        alarm.classList.add('versteckt');
+        if (u.zustand === 'verfallen') {
+          haupt.textContent = 'Seit Stunden kein Signal';
+          alarmText.textContent =
+            'Die Freigabe ist ausgelaufen, ohne dass sich noch einmal etwas gemeldet hat. ' +
+            'Wenn ihr seither nichts voneinander gehört habt, klär, ob jemand angekommen ist.';
+          alarm.classList.remove('versteckt');
+        } else {
+          haupt.textContent = 'Kein aktives Teilen';
+          // Bewusst ohne Entwarnung: Die Seite weiß nicht, ob jemand
+          // angekommen ist. Sie weiß nur, dass nichts mehr gesendet wird.
+          leise.textContent =
+            'Die Freigabe ist beendet oder abgelaufen — es kommt nichts mehr an. ' +
+            'Die zuletzt gezeigte Spur bleibt stehen.';
+          leise.classList.remove('versteckt');
+        }
         return;
       }
 
       herz.classList.remove('still');
-      leise.classList.add('versteckt');
+      merkeSignal(p.aktualisiert);
 
       var pos = [p.lat, p.lng];
       if (!marker) {
@@ -339,74 +385,40 @@
 
       haupt.textContent = 'Unterwegs seit ' + uhr(p.gestartet) + ' Uhr';
 
-      /*
-       * Wie lange ist das letzte Signal her?
-       *
-       * Der gefährlichste Zustand dieser Seite war der stille: Wer ohne
-       * Rückmeldezeit teilt und dann stürzt, dessen Telefon hört einfach auf
-       * zu melden — und die Seite zeigte weiter „Unterwegs seit 09:12" mit
-       * der letzten Position. Sie sah lebendig aus. Genau dafür gibt es sie
-       * aber nicht.
-       *
-       * Die App meldet sich jede Minute, solange sie Empfang hat. Eine
-       * Dreiviertelstunde Stille ist also entweder ein Funkloch oder etwas
-       * anderes — und beides muss dastehen, nicht nur das eine.
-       */
-      var stillMin = Math.round((Date.now() - new Date(p.aktualisiert).getTime()) / 60000);
-      var STILL_HINWEIS = 45;
-      var STILL_ALARM = 150;
-
-      var teile = ['<span class="chip' + (stillMin >= STILL_HINWEIS ? ' spaet' : '') + '">' +
+      var spaet = u.stillMin >= Urteil.STILL_HINWEIS_MIN;
+      var teile = ['<span class="chip' + (spaet ? ' spaet' : '') + '">' +
         UHR + ' ' + zeit(p.aktualisiert) + '</span>'];
       if (p.ele != null) {
         teile.push('<span class="chip">' + GIPFEL + ' ' + p.ele + ' m</span>');
       }
-
-      /*
-       * Rückmeldezeit: Ohne sie bleibt die Seite eine reine Anzeige. Mit ihr
-       * meldet sie sich selbst, wenn jemand nicht zurück ist — genau dann
-       * braucht es eine Entscheidung, und niemand starrt auf den Bildschirm.
-       */
-      var stilleGemeldet = false;
-      if (stillMin >= STILL_HINWEIS) {
-        // Beide Erklärungen nennen. Wer nur „kein Signal" liest, denkt an
-        // einen Fehler der Seite; wer nur „Alarm" liest, ruft beim ersten
-        // Funkloch die Bergrettung.
-        var stilleText =
-          'Seit ' + dauer(stillMin) + ' kein Signal. Das kann ein Funkloch sein — ' +
-          'die App meldet sich sonst jede Minute.';
-        if (stillMin >= STILL_ALARM) {
-          document.getElementById('alarmText').textContent = stilleText;
-          document.getElementById('alarmOrt').textContent =
-            'Letzte Position: ' + p.lat.toFixed(5) + ', ' + p.lng.toFixed(5) +
-            (p.ele != null ? ' · ' + p.ele + ' m' : '');
-          alarm.classList.remove('versteckt');
-          stilleGemeldet = true;
-        } else {
-          leise.textContent = stilleText;
-          leise.classList.remove('versteckt');
-        }
-      }
-
       if (p.zurueck_um) {
-        var restMin = Math.round((new Date(p.zurueck_um).getTime() - Date.now()) / 60000);
-        if (restMin >= 0) {
-          teile.push('<span class="chip">' + ZIEL + ' zurück gegen ' + uhr(p.zurueck_um) + ' Uhr</span>');
-          if (!stilleGemeldet) alarm.classList.add('versteckt');
-        } else {
-          var ueber = Math.abs(restMin);
-          teile.push('<span class="chip spaet">' + ZIEL + ' überfällig seit ' + dauer(ueber) + '</span>');
-          document.getElementById('alarmText').textContent =
-            'Rückmeldung war für ' + uhr(p.zurueck_um) + ' Uhr angekündigt — seither ' +
-            (ueber < 60 ? ueber + ' Minuten' : komma(ueber / 60) + ' Stunden') +
-            ' vergangen. Letztes Signal ' + zeit(p.aktualisiert) + '.';
-          document.getElementById('alarmOrt').textContent =
-            'Letzte Position: ' + p.lat.toFixed(5) + ', ' + p.lng.toFixed(5) +
-            (p.ele != null ? ' · ' + p.ele + ' m' : '');
-          alarm.classList.remove('versteckt');
-        }
+        teile.push(u.ueberMin == null
+          ? '<span class="chip">' + ZIEL + ' zurück gegen ' + uhr(p.zurueck_um) + ' Uhr</span>'
+          : '<span class="chip spaet">' + ZIEL + ' überfällig seit ' + dauer(u.ueberMin) + '</span>');
       }
       chips.innerHTML = teile.join('');
+
+      // Beide Erklärungen nennen. Wer nur „kein Signal" liest, denkt an einen
+      // Fehler der Seite; wer nur „Alarm" liest, ruft beim ersten Funkloch
+      // die Bergrettung.
+      var stilleText = 'Seit ' + dauer(u.stillMin) + ' kein Signal. Das kann ein Funkloch sein — ' +
+        'die App meldet sich sonst jede Minute.';
+      alarmOrt.textContent = 'Letzte Position: ' + p.lat.toFixed(5) + ', ' + p.lng.toFixed(5) +
+        (p.ele != null ? ' · ' + p.ele + ' m' : '');
+
+      if (u.grund === 'ueberfaellig') {
+        alarmText.textContent =
+          'Rückmeldung war für ' + uhr(p.zurueck_um) + ' Uhr angekündigt — seither ' +
+          (u.ueberMin < 60 ? u.ueberMin + ' Minuten' : komma(u.ueberMin / 60) + ' Stunden') +
+          ' vergangen. Letztes Signal ' + zeit(p.aktualisiert) + '.';
+        alarm.classList.remove('versteckt');
+      } else if (u.grund === 'stille') {
+        alarmText.textContent = stilleText;
+        alarm.classList.remove('versteckt');
+      } else if (u.grund === 'stille-leise') {
+        leise.textContent = stilleText;
+        leise.classList.remove('versteckt');
+      }
     }).catch(function () {
       document.getElementById('herz').classList.add('still');
       var leise = document.getElementById('leise');
